@@ -41,12 +41,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ onSuccess }) => {
     }
   };
 
-  const handleFillAdmin = () => {
-    setIsLogin(true);
-    setEmail('kgs2002107@gmail.com');
-    setPassword('1234');
-    setError(null);
-  };
+ 
 
   return (
     <div className="relative min-h-[85vh] flex items-center justify-center p-4 sm:p-6 lg:p-8">
