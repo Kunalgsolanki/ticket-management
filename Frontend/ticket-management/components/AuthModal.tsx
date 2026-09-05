@@ -183,7 +183,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ onSuccess }) => {
             </h2>
             <p className="mt-2 text-sm text-slate-400">
               {isLogin
-                ? 'Sign in — a verification code will be sent to your email'
+                ? 'Sign in - a verification code will be sent to your email'
                 : 'Join the team and start collaborating in real-time'}
             </p>
           </div>
@@ -231,7 +231,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ onSuccess }) => {
               <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">Password</label>
               <div className="relative">
                 <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
-                <input type="password" required placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)}
+                <input type="password" required placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)}
                   className="w-full rounded-xl border border-slate-800 bg-slate-950/70 pl-10 pr-4 py-2.5 text-sm text-white placeholder-slate-600 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-colors" />
               </div>
             </div>
