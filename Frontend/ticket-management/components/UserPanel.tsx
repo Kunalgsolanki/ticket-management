@@ -3,6 +3,7 @@
 import React, { useState, useMemo } from 'react';
 import { Ticket, TicketPriority, TicketStatus, User } from '../lib/types';
 import { ticketSocket } from '../lib/socket';
+import { hasPermission } from '../lib/permissions';
 import {
   User as UserIcon,
   Plus,
@@ -13,21 +14,36 @@ import {
   RefreshCw,
   Flame,
   FileText,
-  Sparkles
+  Sparkles,
+  Edit3,
+  Trash2,
+  Layers,
+  Shield,
+  Lock,
 } from 'lucide-react';
 
 interface UserPanelProps {
   currentUser: User;
   tickets: Ticket[];
   onOpenCreateModal: () => void;
+  onEditTicket: (ticket: Ticket) => void;
 }
 
 export const UserPanel: React.FC<UserPanelProps> = ({
   currentUser,
   tickets,
   onOpenCreateModal,
+  onEditTicket,
 }) => {
-  const [activeTab, setActiveTab] = useState<'created' | 'assigned'>('created');
+  const [activeTab, setActiveTab] = useState<'created' | 'assigned' | 'all'>('created');
+  const [deletingTicketId, setDeletingTicketId] = useState<number | null>(null);
+
+  // ── Permissions Checking ──────────────────────────────────────
+  const canCreate = hasPermission(currentUser, 'ticket:create');
+  const canEdit = hasPermission(currentUser, 'ticket:edit');
+  const canDelete = hasPermission(currentUser, 'ticket:delete');
+  const canChangeStatus = hasPermission(currentUser, 'ticket:change_status');
+  const canViewAll = hasPermission(currentUser, 'ticket:view_all');
 
   // Filter user tickets
   const myCreatedTickets = useMemo(
@@ -44,13 +60,24 @@ export const UserPanel: React.FC<UserPanelProps> = ({
   const stats = useMemo(() => {
     const totalCreated = myCreatedTickets.length;
     const totalAssigned = myAssignedTickets.length;
-    const pendingAssigned = myAssignedTickets.filter((t) => t.status !== 'RESOLVED' && t.status !== 'CLOSED').length;
-    const completedAssigned = myAssignedTickets.filter((t) => t.status === 'RESOLVED' || t.status === 'CLOSED').length;
-    return { totalCreated, totalAssigned, pendingAssigned, completedAssigned };
-  }, [myCreatedTickets, myAssignedTickets]);
+    const pendingAssigned = myAssignedTickets.filter(
+      (t) => t.status !== 'RESOLVED' && t.status !== 'CLOSED'
+    ).length;
+    const completedAssigned = myAssignedTickets.filter(
+      (t) => t.status === 'RESOLVED' || t.status === 'CLOSED'
+    ).length;
+    return { totalCreated, totalAssigned, pendingAssigned, completedAssigned, allTotal: tickets.length };
+  }, [myCreatedTickets, myAssignedTickets, tickets]);
 
   const handleStatusChange = (id: number, newStatus: TicketStatus) => {
+    if (!canChangeStatus) return;
     ticketSocket.update({ id, status: newStatus });
+  };
+
+  const handleDeleteTicket = (id: number) => {
+    if (!canDelete) return;
+    ticketSocket.delete(id);
+    setDeletingTicketId(null);
   };
 
   const getStatusBadge = (status: TicketStatus) => {
@@ -79,7 +106,12 @@ export const UserPanel: React.FC<UserPanelProps> = ({
     }
   };
 
-  const activeTicketsList = activeTab === 'created' ? myCreatedTickets : myAssignedTickets;
+  const activeTicketsList =
+    activeTab === 'created'
+      ? myCreatedTickets
+      : activeTab === 'assigned'
+      ? myAssignedTickets
+      : tickets;
 
   return (
     <div className="space-y-8 animate-fadeIn">
@@ -91,23 +123,43 @@ export const UserPanel: React.FC<UserPanelProps> = ({
               <UserIcon className="h-3.5 w-3.5 text-indigo-400" />
               USER DASHBOARD
             </span>
+
+            {/* Active Role Badge */}
+            <span className="flex h-6 items-center gap-1.5 rounded-full border border-violet-500/30 bg-violet-500/10 px-2.5 text-xs font-semibold text-violet-300">
+              <Shield className="h-3 w-3 text-violet-400" />
+              {currentUser.role}
+            </span>
+
+            {canDelete && (
+              <span className="flex h-6 items-center gap-1 rounded-full border border-rose-500/30 bg-rose-500/10 px-2 text-[11px] font-semibold text-rose-300">
+                <Trash2 className="h-3 w-3 text-rose-400" />
+                Delete Access
+              </span>
+            )}
           </div>
           <h1 className="mt-2 text-2xl font-bold tracking-tight text-white sm:text-3xl">
             My Workspace & Tasks
           </h1>
           <p className="text-sm text-slate-400">
-            Submit issues and track tickets assigned to you with real-time live sync.
+            Submit issues, track tasks, and collaborate with real-time live sync.
           </p>
         </div>
 
         <div>
-          <button
-            onClick={onOpenCreateModal}
-            className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-indigo-500 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-indigo-500/25 hover:from-indigo-500 hover:to-indigo-400 transition-all"
-          >
-            <Plus className="h-4 w-4" />
-            Create Ticket
-          </button>
+          {canCreate ? (
+            <button
+              onClick={onOpenCreateModal}
+              className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-indigo-500 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-indigo-500/25 hover:from-indigo-500 hover:to-indigo-400 transition-all"
+            >
+              <Plus className="h-4 w-4" />
+              Create Ticket
+            </button>
+          ) : (
+            <div className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-900 border border-slate-800 text-xs text-slate-500">
+              <Lock className="h-3.5 w-3.5" />
+              Create Ticket Disabled
+            </div>
+          )}
         </div>
       </div>
 
@@ -147,7 +199,7 @@ export const UserPanel: React.FC<UserPanelProps> = ({
       </div>
 
       {/* Tabs */}
-      <div className="flex border-b border-slate-800">
+      <div className="flex border-b border-slate-800 gap-2">
         <button
           onClick={() => setActiveTab('created')}
           className={`flex items-center gap-2 border-b-2 px-5 py-3 text-sm font-semibold transition-colors ${
@@ -170,6 +222,19 @@ export const UserPanel: React.FC<UserPanelProps> = ({
           <Inbox className="h-4 w-4" />
           Assigned to Me ({myAssignedTickets.length})
         </button>
+        {canViewAll && (
+          <button
+            onClick={() => setActiveTab('all')}
+            className={`flex items-center gap-2 border-b-2 px-5 py-3 text-sm font-semibold transition-colors ${
+              activeTab === 'all'
+                ? 'border-indigo-500 text-indigo-400'
+                : 'border-transparent text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <Layers className="h-4 w-4" />
+            All Organization Tickets ({stats.allTotal})
+          </button>
+        )}
       </div>
 
       {/* Ticket List */}
@@ -177,10 +242,16 @@ export const UserPanel: React.FC<UserPanelProps> = ({
         <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-slate-800 p-12 text-center">
           <FileText className="h-10 w-10 text-slate-600 mb-3" />
           <h3 className="text-base font-semibold text-slate-300">
-            {activeTab === 'created' ? 'You have not created any tickets yet.' : 'No tickets assigned to you.'}
+            {activeTab === 'created'
+              ? 'You have not created any tickets yet.'
+              : activeTab === 'assigned'
+              ? 'No tickets assigned to you.'
+              : 'No tickets found in the organization.'}
           </h3>
           <p className="text-xs text-slate-500 mt-1">
-            {activeTab === 'created' ? 'Click "Create Ticket" above to raise an issue.' : 'Tickets assigned by Admin will appear here in real time.'}
+            {activeTab === 'created' && canCreate
+              ? 'Click "Create Ticket" above to raise an issue.'
+              : 'Tickets will appear here in real time.'}
           </p>
         </div>
       ) : (
@@ -224,30 +295,65 @@ export const UserPanel: React.FC<UserPanelProps> = ({
                 <div>
                   {activeTab === 'created' ? (
                     <span>
-                      Assignee: <strong className="text-slate-200">{ticket.assignedTo?.name || 'Unassigned'}</strong>
+                      Assignee:{' '}
+                      <strong className="text-slate-200">
+                        {ticket.assignedTo?.name || 'Unassigned'}
+                      </strong>
                     </span>
                   ) : (
                     <span>
-                      Created by: <strong className="text-slate-200">{ticket.createdBy?.name || 'User'}</strong>
+                      Created by:{' '}
+                      <strong className="text-slate-200">
+                        {ticket.createdBy?.name || 'User'}
+                      </strong>
                     </span>
                   )}
                 </div>
 
-                {/* If assigned to current user, allow status update */}
-                {activeTab === 'assigned' && (
-                  <div className="flex items-center gap-2">
-                    <span className="text-[10px] text-slate-500">Update:</span>
-                    <select
-                      value={ticket.status}
-                      onChange={(e) => handleStatusChange(ticket.id, e.target.value as TicketStatus)}
-                      className="rounded-lg border border-slate-800 bg-slate-950 px-2 py-1 text-[11px] font-semibold text-slate-200 focus:border-indigo-500 focus:outline-none"
+                {/* Actions Bar */}
+                <div className="flex items-center gap-2">
+                  {/* Status Dropdown (only if canChangeStatus) */}
+                  {canChangeStatus && (activeTab === 'assigned' || ticket.assignedToId === currentUser.id) && (
+                    <div className="flex items-center gap-1.5">
+                      <select
+                        value={ticket.status}
+                        onChange={(e) =>
+                          handleStatusChange(ticket.id, e.target.value as TicketStatus)
+                        }
+                        className="rounded-lg border border-slate-800 bg-slate-950 px-2 py-1 text-[11px] font-semibold text-slate-200 focus:border-indigo-500 focus:outline-none cursor-pointer"
+                      >
+                        <option value="OPEN">OPEN</option>
+                        <option value="IN_PROGRESS">IN PROGRESS</option>
+                        <option value="RESOLVED">RESOLVED</option>
+                        <option value="CLOSED">CLOSED</option>
+                      </select>
+                    </div>
+                  )}
+
+                  {/* Edit Ticket (only if canEdit) */}
+                  {canEdit && (
+                    <button
+                      onClick={() => onEditTicket(ticket)}
+                      className="flex items-center gap-1 rounded-lg border border-slate-800 bg-slate-950 px-2.5 py-1 text-xs font-medium text-slate-300 hover:border-slate-700 hover:bg-slate-800 hover:text-white transition-colors"
+                      title="Edit Ticket Details"
                     >
-                      <option value="OPEN">OPEN</option>
-                      <option value="IN_PROGRESS">IN PROGRESS</option>
-                      <option value="RESOLVED">RESOLVED</option>
-                    </select>
-                  </div>
-                )}
+                      <Edit3 className="h-3.5 w-3.5 text-indigo-400" />
+                      Edit
+                    </button>
+                  )}
+
+                  {/* Delete Ticket (only if canDelete) */}
+                  {canDelete && (
+                    <button
+                      onClick={() => handleDeleteTicket(ticket.id)}
+                      className="flex items-center gap-1 rounded-lg border border-rose-500/20 bg-rose-500/10 px-2 py-1 text-xs font-medium text-rose-300 hover:bg-rose-500/20 hover:border-rose-500/40 transition-colors"
+                      title="Delete Ticket"
+                    >
+                      <Trash2 className="h-3.5 w-3.5 text-rose-400" />
+                      Delete
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
           ))}

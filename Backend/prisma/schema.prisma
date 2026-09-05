@@ -8,15 +8,28 @@ datasource db {
 }
 
 model User {
-  id              Int      @id @default(autoincrement())
+  id              Int       @id @default(autoincrement())
   name            String
-  email           String   @unique
+  email           String    @unique
   password        String
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-  role            UserRole @default(USER)
-  ticketsAssigned Ticket[] @relation("AssignedTickets")
-  ticketsCreated  Ticket[] @relation("CreatedTickets")
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  role            UserRole  @default(USER)
+  customRole      String?
+  permissions     String?   @db.Text
+  otpCode         String?
+  otpExpiresAt    DateTime?
+  ticketsAssigned Ticket[]  @relation("AssignedTickets")
+  ticketsCreated  Ticket[]  @relation("CreatedTickets")
+}
+
+model Role {
+  id          Int      @id @default(autoincrement())
+  name        String   @unique
+  description String?
+  permissions String   @db.Text
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }
 
 model Ticket {
@@ -51,7 +64,6 @@ enum TicketPriority {
   HIGH
   URGENT
 }
-
 enum UserRole {
   USER
   ADMIN

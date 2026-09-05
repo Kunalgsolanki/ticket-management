@@ -9,7 +9,11 @@ import { AuthModal } from '../components/AuthModal';
 import { AdminPanel } from '../components/AdminPanel';
 import { UserPanel } from '../components/UserPanel';
 import { CreateTicketModal } from '../components/CreateTicketModal';
-import { Sparkles, Bell } from 'lucide-react';
+import { EditTicketModal } from '../components/EditTicketModal';
+import { UserManagementModal } from '../components/UserManagementModal';
+import { RolePermissionModal } from '../components/RolePermissionModal';
+import { initBrowserNotifications, showBrowserNotification } from '../lib/firebase';
+import { Bell, Sparkles, X, CheckCircle2, AlertTriangle, Trash2, Info } from 'lucide-react';
 
 export default function Home() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -18,14 +22,16 @@ export default function Home() {
   const [users, setUsers] = useState<User[]>([]);
   const [isConnected, setIsConnected] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [editingTicket, setEditingTicket] = useState<Ticket | null>(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isUserMgmtOpen, setIsUserMgmtOpen] = useState(false);
+  const [isRolePermModalOpen, setIsRolePermModalOpen] = useState(false);
+  const [toastMessage, setToastMessage] = useState<{ title: string; body?: string; type?: 'created' | 'updated' | 'deleted' | 'info' } | null>(null);
 
-  // Show temporary toast notification on live updates
-  const showToast = useCallback((msg: string) => {
-    setToastMessage(msg);
-    setTimeout(() => {
-      setToastMessage(null);
-    }, 4000);
+  // Show rich popup notification
+  const showToast = useCallback((title: string, body?: string, type: 'created' | 'updated' | 'deleted' | 'info' = 'info') => {
+    setToastMessage({ title, body, type });
+    setTimeout(() => setToastMessage(null), 5000);
   }, []);
 
   // 1. Initialize Auth from localStorage
@@ -42,14 +48,29 @@ export default function Home() {
     }
   }, []);
 
-  // 2. Fetch Users on mount or auth
+  // 2. Fetch Users & Sync current user role/permissions
+  const refreshUsersAndSyncCurrentUser = useCallback(() => {
+    fetchAllUsers()
+      .then((data) => {
+        setUsers(data);
+        if (currentUser) {
+          const me = data.find((u) => u.id === currentUser.id);
+          if (me) {
+            setCurrentUser(me);
+            localStorage.setItem('ticket_user', JSON.stringify(me));
+          }
+        }
+      })
+      .catch((err) => console.error('Failed to fetch team users:', err));
+  }, [currentUser]);
+
   useEffect(() => {
     if (currentUser) {
-      fetchAllUsers()
-        .then((data) => setUsers(data))
-        .catch((err) => console.error('Failed to fetch team users:', err));
+      refreshUsersAndSyncCurrentUser();
+      // Initialize browser push notifications (asks permission + shows welcome OS notification)
+      initBrowserNotifications();
     }
-  }, [currentUser]);
+  }, [token]);
 
   // 3. Setup Socket.IO Event Handlers
   useEffect(() => {
@@ -73,19 +94,34 @@ export default function Home() {
         if (exists) return prev;
         return [newTicket, ...prev];
       });
-      showToast(`🎫 New Ticket #${newTicket.id} created: "${newTicket.title}"`);
+
+      showToast(`New Ticket #${newTicket.id}`, `"${newTicket.title}" — Priority: ${newTicket.priority}`, 'created');
+      showBrowserNotification(`New Ticket #${newTicket.id}`, {
+        body: `"${newTicket.title}" [Priority: ${newTicket.priority}]`,
+      });
     }
 
     function onTicketUpdated(updatedTicket: Ticket) {
       setTickets((prev) =>
         prev.map((t) => (t.id === updatedTicket.id ? updatedTicket : t))
       );
-      showToast(`⚡ Ticket #${updatedTicket.id} updated (Status: ${updatedTicket.status})`);
+
+      // Keep editing ticket in sync if modal is open
+      setEditingTicket((current) => (current?.id === updatedTicket.id ? updatedTicket : current));
+
+      showToast(`Ticket #${updatedTicket.id} Updated`, `"${updatedTicket.title}" is now ${updatedTicket.status}`, 'updated');
+      showBrowserNotification(`Ticket #${updatedTicket.id} Updated`, {
+        body: `"${updatedTicket.title}" is now ${updatedTicket.status} [${updatedTicket.priority}]`,
+      });
     }
 
     function onTicketDeleted({ id }: { id: number }) {
       setTickets((prev) => prev.filter((t) => t.id !== id));
-      showToast(`🗑️ Ticket #${id} was deleted`);
+      setEditingTicket((current) => (current?.id === id ? null : current));
+      showToast(`Ticket #${id} Deleted`, 'The ticket was permanently removed.', 'deleted');
+      showBrowserNotification('Ticket Removed', {
+        body: `Ticket #${id} was permanently deleted`,
+      });
     }
 
     // Register socket listeners
@@ -118,14 +154,24 @@ export default function Home() {
     localStorage.setItem('ticket_user', JSON.stringify(user));
     localStorage.setItem('ticket_token', userToken);
     ticketSocket.fetchAll();
+    // Set up notifications on fresh login
+    initBrowserNotifications();
   };
 
   // Handle Logout
   const handleLogout = () => {
     setCurrentUser(null);
     setToken(null);
+    setEditingTicket(null);
+    setIsEditModalOpen(false);
     localStorage.removeItem('ticket_user');
     localStorage.removeItem('ticket_token');
+  };
+
+  // Handle Open Edit Modal
+  const handleOpenEditModal = (ticket: Ticket) => {
+    setEditingTicket(ticket);
+    setIsEditModalOpen(true);
   };
 
   return (
@@ -147,12 +193,16 @@ export default function Home() {
             tickets={tickets}
             users={users}
             onOpenCreateModal={() => setIsCreateModalOpen(true)}
+            onEditTicket={handleOpenEditModal}
+            onManageUsers={() => setIsUserMgmtOpen(true)}
+            onManagePermissions={() => setIsRolePermModalOpen(true)}
           />
         ) : (
           <UserPanel
             currentUser={currentUser}
             tickets={tickets}
             onOpenCreateModal={() => setIsCreateModalOpen(true)}
+            onEditTicket={handleOpenEditModal}
           />
         )}
       </main>
@@ -167,13 +217,111 @@ export default function Home() {
         />
       )}
 
-      {/* Live Toast Notification */}
+      {/* Edit Ticket Modal Overlay (Admin & User) */}
+      {currentUser && editingTicket && (
+        <EditTicketModal
+          currentUser={currentUser}
+          ticket={editingTicket}
+          users={users}
+          isOpen={isEditModalOpen}
+          onClose={() => {
+            setIsEditModalOpen(false);
+            setEditingTicket(null);
+          }}
+        />
+      )}
+
+      {/* User Management Modal (Admin only) */}
+      {currentUser && currentUser.role === 'ADMIN' && token && (
+        <UserManagementModal
+          isOpen={isUserMgmtOpen}
+          onClose={() => setIsUserMgmtOpen(false)}
+          currentUser={currentUser}
+          users={users}
+          tickets={tickets}
+          token={token}
+          onUsersUpdated={refreshUsersAndSyncCurrentUser}
+        />
+      )}
+
+      {/* Role & Permission Management Modal (Admin only) */}
+      {currentUser && token && (
+        <RolePermissionModal
+          isOpen={isRolePermModalOpen}
+          onClose={() => setIsRolePermModalOpen(false)}
+          currentUser={currentUser}
+          users={users}
+          token={token}
+          onUsersUpdated={refreshUsersAndSyncCurrentUser}
+        />
+      )}
+
+      {/* Rich Popup Notification */}
       {toastMessage && (
-        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-3 rounded-2xl border border-slate-800 bg-slate-900/95 px-4 py-3 text-sm text-white shadow-2xl backdrop-blur-xl animate-fadeIn border-l-4 border-l-indigo-500">
-          <Bell className="h-4 w-4 text-indigo-400 shrink-0" />
-          <span>{toastMessage}</span>
+        <div
+          key={toastMessage.title}
+          className="fixed bottom-6 right-6 z-50 w-80 overflow-hidden rounded-2xl border border-slate-700/60 bg-slate-900/95 shadow-2xl backdrop-blur-xl"
+          style={{ animation: 'slideInRight 0.35s cubic-bezier(0.34,1.56,0.64,1)' }}
+        >
+          {/* Colour accent bar by type */}
+          <div className={`h-0.5 w-full ${
+            toastMessage.type === 'created' ? 'bg-gradient-to-r from-emerald-500 to-teal-400' :
+            toastMessage.type === 'updated' ? 'bg-gradient-to-r from-indigo-500 to-blue-400' :
+            toastMessage.type === 'deleted' ? 'bg-gradient-to-r from-rose-500 to-red-400' :
+            'bg-gradient-to-r from-amber-500 to-yellow-400'
+          }`} />
+
+          <div className="flex items-start gap-3 p-4">
+            {/* Icon */}
+            <div className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl ${
+              toastMessage.type === 'created' ? 'bg-emerald-500/15 text-emerald-400' :
+              toastMessage.type === 'updated' ? 'bg-indigo-500/15 text-indigo-400' :
+              toastMessage.type === 'deleted' ? 'bg-rose-500/15 text-rose-400' :
+              'bg-amber-500/15 text-amber-400'
+            }`}>
+              {toastMessage.type === 'created' && <CheckCircle2 className="h-4 w-4" />}
+              {toastMessage.type === 'updated' && <Bell className="h-4 w-4" />}
+              {toastMessage.type === 'deleted' && <Trash2 className="h-4 w-4" />}
+              {(toastMessage.type === 'info' || !toastMessage.type) && <Info className="h-4 w-4" />}
+            </div>
+
+            {/* Content */}
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-white leading-snug">{toastMessage.title}</p>
+              {toastMessage.body && (
+                <p className="mt-0.5 text-xs text-slate-400 leading-relaxed truncate">{toastMessage.body}</p>
+              )}
+            </div>
+
+            {/* Close */}
+            <button
+              onClick={() => setToastMessage(null)}
+              className="shrink-0 rounded-lg p-1 text-slate-500 hover:bg-slate-800 hover:text-white transition-colors"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
+
+          {/* Auto-dismiss progress bar */}
+          <div className={`h-0.5 ${
+            toastMessage.type === 'created' ? 'bg-emerald-500/30' :
+            toastMessage.type === 'updated' ? 'bg-indigo-500/30' :
+            toastMessage.type === 'deleted' ? 'bg-rose-500/30' :
+            'bg-amber-500/30'
+          }`}>
+            <div
+              className={`h-full ${
+                toastMessage.type === 'created' ? 'bg-emerald-500' :
+                toastMessage.type === 'updated' ? 'bg-indigo-500' :
+                toastMessage.type === 'deleted' ? 'bg-rose-500' :
+                'bg-amber-500'
+              }`}
+              style={{ animation: 'shrinkWidth 5s linear forwards' }}
+            />
+          </div>
         </div>
       )}
     </div>
   );
 }
+

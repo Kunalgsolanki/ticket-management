@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Ticket, TicketPriority, TicketStatus, User } from '../lib/types';
 import { ticketSocket } from '../lib/socket';
 import {
@@ -19,14 +19,25 @@ import {
   UserCheck,
   Tag,
   ArrowUpDown,
-  FileText
+  FileText,
+  Edit3,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
+  UserCog,
+  KeyRound,
 } from 'lucide-react';
+
 
 interface AdminPanelProps {
   currentUser: User;
   tickets: Ticket[];
   users: User[];
   onOpenCreateModal: () => void;
+  onEditTicket: (ticket: Ticket) => void;
+  onManageUsers?: () => void;
+  onManagePermissions?: () => void;
 }
 
 export const AdminPanel: React.FC<AdminPanelProps> = ({
@@ -34,12 +45,19 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   tickets,
   users,
   onOpenCreateModal,
+  onEditTicket,
+  onManageUsers = () => {},
+  onManagePermissions = () => {},
 }) => {
   const [activeTab, setActiveTab] = useState<'tickets' | 'users'>('tickets');
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
   const [priorityFilter, setPriorityFilter] = useState<string>('ALL');
   const [deletingTicketId, setDeletingTicketId] = useState<number | null>(null);
+
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
   // Computed Metrics
   const metrics = useMemo(() => {
@@ -66,6 +84,18 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       return matchesSearch && matchesStatus && matchesPriority;
     });
   }, [tickets, searchQuery, statusFilter, priorityFilter]);
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, statusFilter, priorityFilter, pageSize]);
+
+  // Pagination calculations
+  const totalPages = Math.max(1, Math.ceil(filteredTickets.length / pageSize));
+  const paginatedTickets = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredTickets.slice(start, start + pageSize);
+  }, [filteredTickets, currentPage, pageSize]);
 
   const handleStatusChange = (id: number, newStatus: TicketStatus) => {
     ticketSocket.update({ id, status: newStatus });
@@ -131,6 +161,20 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         </div>
 
         <div className="flex items-center gap-3">
+          <button
+            onClick={onManagePermissions}
+            className="flex items-center gap-2 rounded-xl border border-violet-500/30 bg-violet-500/10 px-4 py-2.5 text-sm font-semibold text-violet-300 hover:bg-violet-500/20 transition-all shadow-sm"
+          >
+            <KeyRound className="h-4 w-4" />
+            Roles & Permissions
+          </button>
+          <button
+            onClick={onManageUsers}
+            className="flex items-center gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-2.5 text-sm font-semibold text-amber-300 hover:bg-amber-500/20 transition-all"
+          >
+            <UserCog className="h-4 w-4" />
+            Manage Users
+          </button>
           <button
             onClick={onOpenCreateModal}
             className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-indigo-500 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-indigo-500/25 hover:from-indigo-500 hover:to-indigo-400 transition-all"
@@ -283,7 +327,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-800/60">
-                    {filteredTickets.map((ticket) => (
+                    {paginatedTickets.map((ticket) => (
                       <tr key={ticket.id} className="hover:bg-slate-800/30 transition-colors">
                         {/* Title & Description */}
                         <td className="px-6 py-4 max-w-xs sm:max-w-sm">
@@ -352,18 +396,116 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
                         {/* Actions */}
                         <td className="px-6 py-4 text-right">
-                          <button
-                            onClick={() => setDeletingTicketId(ticket.id)}
-                            className="rounded-lg p-1.5 text-slate-500 hover:bg-rose-500/10 hover:text-rose-400 transition-colors"
-                            title="Delete Ticket"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
+                          <div className="flex items-center justify-end gap-1.5">
+                            <button
+                              onClick={() => onEditTicket(ticket)}
+                              className="rounded-lg p-1.5 text-slate-400 hover:bg-indigo-500/10 hover:text-indigo-400 transition-colors"
+                              title="Edit Ticket Details"
+                            >
+                              <Edit3 className="h-4 w-4" />
+                            </button>
+                            <button
+                              onClick={() => setDeletingTicketId(ticket.id)}
+                              className="rounded-lg p-1.5 text-slate-500 hover:bg-rose-500/10 hover:text-rose-400 transition-colors"
+                              title="Delete Ticket"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
+              </div>
+
+              {/* Pagination Bar */}
+              <div className="flex flex-col gap-3 border-t border-slate-800 px-6 py-4 sm:flex-row sm:items-center sm:justify-between">
+                {/* Left: info + page size */}
+                <div className="flex items-center gap-3 text-xs text-slate-400">
+                  <span>
+                    Showing{' '}
+                    <span className="font-semibold text-slate-200">
+                      {filteredTickets.length === 0 ? 0 : (currentPage - 1) * pageSize + 1}–{Math.min(currentPage * pageSize, filteredTickets.length)}
+                    </span>{' '}
+                    of{' '}
+                    <span className="font-semibold text-slate-200">{filteredTickets.length}</span> tickets
+                  </span>
+                  <select
+                    value={pageSize}
+                    onChange={(e) => setPageSize(Number(e.target.value))}
+                    className="rounded-lg border border-slate-800 bg-slate-950 px-2 py-1 text-xs text-slate-300 focus:border-indigo-500 focus:outline-none"
+                  >
+                    {[5, 10, 20, 50].map((s) => (
+                      <option key={s} value={s}>{s} / page</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Right: page controls */}
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => setCurrentPage(1)}
+                    disabled={currentPage === 1}
+                    className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-800 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                    title="First page"
+                  >
+                    <ChevronsLeft className="h-4 w-4" />
+                  </button>
+                  <button
+                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                    disabled={currentPage === 1}
+                    className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-800 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                    title="Previous page"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </button>
+
+                  {/* Page number pills */}
+                  <div className="flex items-center gap-1 mx-1">
+                    {Array.from({ length: totalPages }, (_, i) => i + 1)
+                      .filter((p) => p === 1 || p === totalPages || Math.abs(p - currentPage) <= 1)
+                      .reduce<(number | 'ellipsis')[]>((acc, p, idx, arr) => {
+                        if (idx > 0 && p - (arr[idx - 1] as number) > 1) acc.push('ellipsis');
+                        acc.push(p);
+                        return acc;
+                      }, [])
+                      .map((item, idx) =>
+                        item === 'ellipsis' ? (
+                          <span key={`ellipsis-${idx}`} className="px-1 text-slate-600 text-xs">…</span>
+                        ) : (
+                          <button
+                            key={item}
+                            onClick={() => setCurrentPage(item as number)}
+                            className={`min-w-[28px] h-7 rounded-lg text-xs font-semibold transition-colors ${
+                              currentPage === item
+                                ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/25'
+                                : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                            }`}
+                          >
+                            {item}
+                          </button>
+                        )
+                      )}
+                  </div>
+
+                  <button
+                    onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                    disabled={currentPage === totalPages}
+                    className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-800 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                    title="Next page"
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </button>
+                  <button
+                    onClick={() => setCurrentPage(totalPages)}
+                    disabled={currentPage === totalPages}
+                    className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-800 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                    title="Last page"
+                  >
+                    <ChevronsRight className="h-4 w-4" />
+                  </button>
+                </div>
               </div>
             </div>
           )}

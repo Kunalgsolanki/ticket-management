@@ -6,6 +6,8 @@ const { Server } = require('socket.io');
 
 const userRoutes = require('./routes/user');
 const ticketRoutes = require('./routes/ticket');
+const roleRoutes = require('./routes/role');
+const { seedDefaultRoles } = require('./controllers/roleController');
 const registerTicketHandlers = require('./sockets/ticketSocket');
 
 const app = express();
@@ -30,11 +32,13 @@ app.use(bodyParser.json());
 
 app.use('/user', userRoutes);
 app.use('/ticket', ticketRoutes);
+app.use('/role', roleRoutes);
 
 // Register WebSocket Ticket CRUD Handlers
 registerTicketHandlers(io);
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => {
+server.listen(PORT, async () => {
   console.log(`Server running on http://localhost:${PORT} with WebSocket support enabled`);
+  await seedDefaultRoles();
 });

@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { User } from '../lib/types';
-import { Ticket, Shield, User as UserIcon, LogOut, Radio } from 'lucide-react';
+import { Ticket, Shield, User as UserIcon, LogOut, Radio, Bell } from 'lucide-react';
 
 interface NavbarProps {
   user: User | null;
@@ -77,20 +77,19 @@ export const Navbar: React.FC<NavbarProps> = ({ user, isConnected, onLogout }) =
                 className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold border ${
                   user.role === 'ADMIN'
                     ? 'border-amber-500/30 bg-amber-500/10 text-amber-300'
+                    : user.role === 'MANAGER'
+                    ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300'
+                    : user.role === 'SUPPORT_AGENT'
+                    ? 'border-cyan-500/30 bg-cyan-500/10 text-cyan-300'
                     : 'border-indigo-500/30 bg-indigo-500/10 text-indigo-300'
                 }`}
               >
                 {user.role === 'ADMIN' ? (
-                  <>
-                    <Shield className="h-3 w-3 text-amber-400" />
-                    ADMIN
-                  </>
+                  <Shield className="h-3 w-3 text-amber-400" />
                 ) : (
-                  <>
-                    <UserIcon className="h-3 w-3 text-indigo-400" />
-                    USER
-                  </>
+                  <UserIcon className="h-3 w-3 text-indigo-400" />
                 )}
+                {user.role}
               </span>
 
               {/* Logout Button */}
