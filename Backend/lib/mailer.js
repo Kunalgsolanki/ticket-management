@@ -1,4 +1,5 @@
 const { Resend } = require('resend');
+const nodemailer = require('nodemailer');
 
 /**
  * Sends a 6-digit OTP email using the official Resend SDK.
@@ -56,6 +57,37 @@ async function sendOtpEmail(toEmail, otp, userName = 'User') {
   console.log(`OTP Code  : >>> ${otp} <<<`);
   console.log(`Expires In: 10 minutes`);
   console.log(`==================================================\n`);
+
+  // Use SMTP when configured. SMTP providers deliver to any valid recipient.
+  if (process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS) {
+    try {
+      const transporter = nodemailer.createTransport({
+        host: process.env.SMTP_HOST,
+        port: Number(process.env.SMTP_PORT || 465),
+        secure: process.env.SMTP_SECURE !== 'false',
+        auth: {
+          user: process.env.SMTP_USER,
+          pass: process.env.SMTP_PASS,
+        },
+      });
+
+      const from = process.env.EMAIL_FROM || process.env.SMTP_USER;
+      console.log(`[Mailer] Sending OTP via SMTP to ${toEmail}...`);
+
+      const result = await transporter.sendMail({
+        from,
+        to: toEmail,
+        subject,
+        html: htmlContent,
+        text: textContent,
+      });
+
+      console.log(`✅ [Mailer] SMTP delivered successfully. ID: ${result.messageId}`);
+      return { success: true, provider: 'smtp', id: result.messageId };
+    } catch (err) {
+      console.error(`❌ [Mailer] SMTP exception:`, err.message);
+    }
+  }
 
   // Use official Resend SDK if API key is configured
   if (process.env.RESEND_API_KEY) {
