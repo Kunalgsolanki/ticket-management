@@ -7,18 +7,13 @@ import {
   Shield,
   Plus,
   Search,
-  Filter,
   Users,
   Layers,
   Clock,
   CheckCircle2,
-  AlertCircle,
   Flame,
   Trash2,
   RefreshCw,
-  UserCheck,
-  Tag,
-  ArrowUpDown,
   FileText,
   Edit3,
   ChevronLeft,
@@ -41,7 +36,6 @@ interface AdminPanelProps {
 }
 
 export const AdminPanel: React.FC<AdminPanelProps> = ({
-  currentUser,
   tickets,
   users,
   onOpenCreateModal,
@@ -177,7 +171,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           </button>
           <button
             onClick={onOpenCreateModal}
-            className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-indigo-500 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-indigo-500/25 hover:from-indigo-500 hover:to-indigo-400 transition-all"
+            className="flex items-center gap-2 rounded-xl bg-linear-to-r from-indigo-600 to-indigo-500 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-indigo-500/25 hover:from-indigo-500 hover:to-indigo-400 transition-all"
           >
             <Plus className="h-4 w-4" />
             New Ticket
@@ -377,7 +371,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                           <select
                             value={ticket.assignedToId || ''}
                             onChange={(e) => handleAssigneeChange(ticket.id, e.target.value)}
-                            className="rounded-lg border border-slate-800 bg-slate-950 px-2.5 py-1 text-xs font-medium text-slate-200 focus:border-indigo-500 focus:outline-none cursor-pointer max-w-[140px] truncate"
+                            className="rounded-lg border border-slate-800 bg-slate-950 px-2.5 py-1 text-xs font-medium text-slate-200 focus:border-indigo-500 focus:outline-none cursor-pointer max-w-35 truncate"
                           >
                             <option value="">Unassigned</option>
                             {users.map((u) => (
@@ -477,7 +471,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                           <button
                             key={item}
                             onClick={() => setCurrentPage(item as number)}
-                            className={`min-w-[28px] h-7 rounded-lg text-xs font-semibold transition-colors ${
+                            className={`min-w-7 h-7 rounded-lg text-xs font-semibold transition-colors ${
                               currentPage === item
                                 ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/25'
                                 : 'text-slate-400 hover:bg-slate-800 hover:text-white'

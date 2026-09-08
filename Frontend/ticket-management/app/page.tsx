@@ -12,6 +12,9 @@ import { CreateTicketModal } from '../components/CreateTicketModal';
 import { EditTicketModal } from '../components/EditTicketModal';
 import { UserManagementModal } from '../components/UserManagementModal';
 import { RolePermissionModal } from '../components/RolePermissionModal';
+import { hasPermission } from '../lib/permissions';
+import { WorkspaceSidebar } from '../components/WorkspaceSidebar';
+import { useAppContext } from '../lib/app-context';
 import { initBrowserNotifications, showBrowserNotification } from '../lib/firebase';
 import { Bell, Sparkles, X, CheckCircle2, AlertTriangle, Trash2, Info } from 'lucide-react';
 
@@ -24,9 +27,8 @@ export default function Home() {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [editingTicket, setEditingTicket] = useState<Ticket | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [isUserMgmtOpen, setIsUserMgmtOpen] = useState(false);
-  const [isRolePermModalOpen, setIsRolePermModalOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState<{ title: string; body?: string; type?: 'created' | 'updated' | 'deleted' | 'info' } | null>(null);
+  const { workspaceView, setWorkspaceView } = useAppContext();
 
   // Show rich popup notification
   const showToast = useCallback((title: string, body?: string, type: 'created' | 'updated' | 'deleted' | 'info' = 'info') => {
@@ -174,38 +176,68 @@ export default function Home() {
     setIsEditModalOpen(true);
   };
 
-  return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col selection:bg-indigo-500 selection:text-white">
-      {/* Top Navbar */}
-      <Navbar
-        user={currentUser}
-        isConnected={isConnected}
-        onLogout={handleLogout}
-      />
+  const canManageUsers = hasPermission(currentUser, 'user:manage');
+  const canManagePermissions = hasPermission(currentUser, 'role:manage');
 
-      {/* Main Content Area */}
-      <main className="flex-1 mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-        {!currentUser ? (
+  return (
+    <div className="app-shell min-h-screen bg-[var(--background)] text-[var(--foreground)] selection:bg-zinc-400 selection:text-black md:flex">
+      {!currentUser ? (
+        <main className="flex min-h-screen flex-1 items-center justify-center p-4">
           <AuthModal onSuccess={handleAuthSuccess} />
-        ) : currentUser.role === 'ADMIN' ? (
-          <AdminPanel
-            currentUser={currentUser}
-            tickets={tickets}
-            users={users}
-            onOpenCreateModal={() => setIsCreateModalOpen(true)}
-            onEditTicket={handleOpenEditModal}
-            onManageUsers={() => setIsUserMgmtOpen(true)}
-            onManagePermissions={() => setIsRolePermModalOpen(true)}
-          />
-        ) : (
-          <UserPanel
-            currentUser={currentUser}
-            tickets={tickets}
-            onOpenCreateModal={() => setIsCreateModalOpen(true)}
-            onEditTicket={handleOpenEditModal}
-          />
-        )}
-      </main>
+        </main>
+      ) : (
+        <>
+          <WorkspaceSidebar user={currentUser} onLogout={handleLogout} />
+          <div className="min-w-0 flex-1">
+            <Navbar user={currentUser} isConnected={isConnected} onLogout={handleLogout} />
+            <main className="mx-auto w-full max-w-[1600px] px-4 py-6 sm:px-6 lg:px-8">
+              {workspaceView === 'tickets' && (currentUser.role === 'ADMIN' ? (
+                <AdminPanel
+                  currentUser={currentUser}
+                  tickets={tickets}
+                  users={users}
+                  onOpenCreateModal={() => setIsCreateModalOpen(true)}
+                  onEditTicket={handleOpenEditModal}
+                  onManageUsers={() => setWorkspaceView('users')}
+                  onManagePermissions={() => setWorkspaceView('roles')}
+                />
+              ) : (
+                <UserPanel
+                  currentUser={currentUser}
+                  tickets={tickets}
+                  onOpenCreateModal={() => setIsCreateModalOpen(true)}
+                  onEditTicket={handleOpenEditModal}
+                  onManageUsers={() => setWorkspaceView('users')}
+                  onManagePermissions={() => setWorkspaceView('roles')}
+                />
+              ))}
+              {workspaceView === 'users' && canManageUsers && (
+                <UserManagementModal
+                  isOpen
+                  embedded
+                  onClose={() => setWorkspaceView('tickets')}
+                  currentUser={currentUser}
+                  users={users}
+                  tickets={tickets}
+                  token={token || ''}
+                  onUsersUpdated={refreshUsersAndSyncCurrentUser}
+                />
+              )}
+              {workspaceView === 'roles' && canManagePermissions && (
+                <RolePermissionModal
+                  isOpen
+                  embedded
+                  onClose={() => setWorkspaceView('tickets')}
+                  currentUser={currentUser}
+                  users={users}
+                  token={token || ''}
+                  onUsersUpdated={refreshUsersAndSyncCurrentUser}
+                />
+              )}
+            </main>
+          </div>
+        </>
+      )}
 
       {/* Create Ticket Modal Overlay */}
       {currentUser && (
@@ -228,31 +260,6 @@ export default function Home() {
             setIsEditModalOpen(false);
             setEditingTicket(null);
           }}
-        />
-      )}
-
-      {/* User Management Modal (Admin only) */}
-      {currentUser && currentUser.role === 'ADMIN' && token && (
-        <UserManagementModal
-          isOpen={isUserMgmtOpen}
-          onClose={() => setIsUserMgmtOpen(false)}
-          currentUser={currentUser}
-          users={users}
-          tickets={tickets}
-          token={token}
-          onUsersUpdated={refreshUsersAndSyncCurrentUser}
-        />
-      )}
-
-      {/* Role & Permission Management Modal (Admin only) */}
-      {currentUser && token && (
-        <RolePermissionModal
-          isOpen={isRolePermModalOpen}
-          onClose={() => setIsRolePermModalOpen(false)}
-          currentUser={currentUser}
-          users={users}
-          token={token}
-          onUsersUpdated={refreshUsersAndSyncCurrentUser}
         />
       )}
 

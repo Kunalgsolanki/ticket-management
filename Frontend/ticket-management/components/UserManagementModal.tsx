@@ -18,6 +18,7 @@ import {
 
 interface UserManagementModalProps {
   isOpen: boolean;
+  embedded?: boolean;
   onClose: () => void;
   currentUser: User;
   users: User[];
@@ -28,6 +29,7 @@ interface UserManagementModalProps {
 
 export const UserManagementModal: React.FC<UserManagementModalProps> = ({
   isOpen,
+  embedded = false,
   onClose,
   currentUser,
   users,
@@ -128,8 +130,8 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
   });
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fadeIn">
-      <div className="w-full max-w-3xl max-h-[85vh] flex flex-col rounded-2xl border border-slate-800 bg-slate-900 shadow-2xl overflow-hidden">
+    <div className={embedded ? 'animate-fadeIn' : 'fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm'}>
+      <div className={`w-full ${embedded ? 'max-w-5xl' : 'max-w-3xl'} max-h-[85vh] flex flex-col rounded-xl border border-slate-800 bg-slate-900 shadow-2xl overflow-hidden`}>
 
         {/* Header */}
         <div className="flex items-center justify-between border-b border-slate-800 px-6 py-4">
@@ -139,7 +141,7 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
             </div>
             <div>
               <h2 className="text-lg font-bold text-white">User Management</h2>
-              <p className="text-xs text-slate-400">{users.length} team members • Admin only</p>
+              <p className="text-xs text-slate-400">{users.length} team members • Permission-based access</p>
             </div>
           </div>
           <div className="flex items-center gap-2">

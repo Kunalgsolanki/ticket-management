@@ -30,6 +30,7 @@ import {
 
 interface RolePermissionModalProps {
   isOpen: boolean;
+  embedded?: boolean;
   onClose: () => void;
   currentUser: User;
   users: User[];
@@ -39,6 +40,7 @@ interface RolePermissionModalProps {
 
 export const RolePermissionModal: React.FC<RolePermissionModalProps> = ({
   isOpen,
+  embedded = false,
   onClose,
   currentUser,
   users,
@@ -243,8 +245,8 @@ export const RolePermissionModal: React.FC<RolePermissionModalProps> = ({
   );
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 overflow-y-auto backdrop-blur-md bg-slate-950/70 animate-fade-in">
-      <div className="relative w-full max-w-5xl rounded-2xl bg-slate-900 border border-slate-800 shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+    <div className={embedded ? 'animate-fadeIn' : 'fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-slate-950/70 p-4 backdrop-blur-md sm:p-6'}>
+      <div className={`role-permission-shell relative w-full ${embedded ? 'max-w-6xl' : 'max-w-5xl'} rounded-xl bg-slate-900 border border-slate-800 shadow-2xl overflow-hidden flex flex-col max-h-[90vh]`}>
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800 bg-slate-900/90 sticky top-0 z-10">
           <div className="flex items-center space-x-3">
@@ -326,7 +328,7 @@ export const RolePermissionModal: React.FC<RolePermissionModalProps> = ({
 
         {/* Tab 1: Roles & Permissions Matrix */}
         {activeTab === 'roles' && (
-          <div className="p-6 flex-1 overflow-y-auto space-y-6">
+          <div className="role-permission-content p-6 flex-1 min-h-0 overflow-y-auto space-y-6">
             {/* Top Action Row */}
             <div className="flex items-center justify-between">
               <div>
@@ -627,7 +629,7 @@ export const RolePermissionModal: React.FC<RolePermissionModalProps> = ({
 
         {/* Tab 2: User Role Assignments */}
         {activeTab === 'users' && (
-          <div className="p-6 flex-1 overflow-y-auto space-y-5">
+          <div className="role-permission-content p-6 flex-1 min-h-0 overflow-y-auto space-y-5">
             {/* Search & Stats */}
             <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
               <div className="relative w-full sm:w-80">

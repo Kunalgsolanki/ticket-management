@@ -20,6 +20,8 @@ import {
   Layers,
   Shield,
   Lock,
+  UserCog,
+  KeyRound,
 } from 'lucide-react';
 
 interface UserPanelProps {
@@ -27,6 +29,8 @@ interface UserPanelProps {
   tickets: Ticket[];
   onOpenCreateModal: () => void;
   onEditTicket: (ticket: Ticket) => void;
+  onManageUsers?: () => void;
+  onManagePermissions?: () => void;
 }
 
 export const UserPanel: React.FC<UserPanelProps> = ({
@@ -34,6 +38,8 @@ export const UserPanel: React.FC<UserPanelProps> = ({
   tickets,
   onOpenCreateModal,
   onEditTicket,
+  onManageUsers = () => {},
+  onManagePermissions = () => {},
 }) => {
   const [activeTab, setActiveTab] = useState<'created' | 'assigned' | 'all'>('created');
   const [deletingTicketId, setDeletingTicketId] = useState<number | null>(null);
@@ -44,6 +50,8 @@ export const UserPanel: React.FC<UserPanelProps> = ({
   const canDelete = hasPermission(currentUser, 'ticket:delete');
   const canChangeStatus = hasPermission(currentUser, 'ticket:change_status');
   const canViewAll = hasPermission(currentUser, 'ticket:view_all');
+  const canManageUsers = hasPermission(currentUser, 'user:manage');
+  const canManagePermissions = hasPermission(currentUser, 'role:manage');
 
   // Filter user tickets
   const myCreatedTickets = useMemo(
@@ -145,7 +153,25 @@ export const UserPanel: React.FC<UserPanelProps> = ({
           </p>
         </div>
 
-        <div>
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          {canManagePermissions && (
+            <button
+              onClick={onManagePermissions}
+              className="flex items-center gap-2 rounded-xl border border-violet-500/30 bg-violet-500/10 px-3 py-2.5 text-sm font-semibold text-violet-300 hover:bg-violet-500/20 transition-all"
+            >
+              <KeyRound className="h-4 w-4" />
+              Roles & Permissions
+            </button>
+          )}
+          {canManageUsers && (
+            <button
+              onClick={onManageUsers}
+              className="flex items-center gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2.5 text-sm font-semibold text-amber-300 hover:bg-amber-500/20 transition-all"
+            >
+              <UserCog className="h-4 w-4" />
+              Manage Users
+            </button>
+          )}
           {canCreate ? (
             <button
               onClick={onOpenCreateModal}

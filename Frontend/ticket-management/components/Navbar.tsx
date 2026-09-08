@@ -17,8 +17,8 @@ export const Navbar: React.FC<NavbarProps> = ({ user, isConnected, onLogout }) =
         
         {/* Brand Logo */}
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-cyan-400 shadow-lg shadow-indigo-500/25">
-            <Ticket className="h-5 w-5 text-white" />
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--foreground)] text-[var(--background)] shadow-lg shadow-black/20">
+            <Ticket className="h-5 w-5" />
           </div>
           <div>
             <span className="text-lg font-bold tracking-tight text-white sm:text-xl">
