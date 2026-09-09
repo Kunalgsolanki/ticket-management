@@ -1,9 +1,10 @@
 'use client';
 
-import React, { useState } from 'react';
+import React from 'react';
+import { useForm } from 'react-hook-form';
 import { TicketPriority, User } from '../lib/types';
 import { ticketSocket } from '../lib/socket';
-import { X, Plus, Sparkles, Tag, UserCheck, AlertTriangle } from 'lucide-react';
+import { X, Plus, Sparkles, AlertTriangle } from 'lucide-react';
 
 interface CreateTicketModalProps {
   currentUser: User;
@@ -12,47 +13,48 @@ interface CreateTicketModalProps {
   onClose: () => void;
 }
 
+interface CreateTicketFormValues {
+  title: string;
+  description: string;
+  priority: TicketPriority;
+  assignedToId: string;
+}
+
 export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
   currentUser,
   users = [],
   isOpen,
   onClose,
 }) => {
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
-  const [priority, setPriority] = useState<TicketPriority>('MEDIUM');
-  const [assignedToId, setAssignedToId] = useState<string>('');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors, isSubmitting },
+  } = useForm<CreateTicketFormValues>({
+    defaultValues: {
+      title: '',
+      description: '',
+      priority: 'MEDIUM',
+      assignedToId: '',
+    },
+  });
 
   if (!isOpen) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!title.trim()) {
-      setError('Please provide a ticket title');
-      return;
-    }
-
-    setLoading(true);
-    setError(null);
-
+  const onSubmit = (formValues: CreateTicketFormValues) => {
     // Emit real-time WebSocket ticket creation event
     ticketSocket.create({
-      title: title.trim(),
-      description: description.trim(),
+      title: formValues.title.trim(),
+      description: formValues.description.trim(),
       createdById: currentUser.id,
-      assignedToId: assignedToId ? Number(assignedToId) : null,
-      priority,
+      assignedToId: formValues.assignedToId ? Number(formValues.assignedToId) : null,
+      priority: formValues.priority,
       status: 'OPEN',
     });
 
-    setLoading(false);
     onClose();
-    setTitle('');
-    setDescription('');
-    setPriority('MEDIUM');
-    setAssignedToId('');
+    reset();
   };
 
   return (
@@ -79,11 +81,11 @@ export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          {error && (
+        <form onSubmit={handleSubmit(onSubmit)} className="p-6 space-y-4">
+          {errors.title && (
             <div className="flex items-center gap-2 rounded-xl border border-rose-500/30 bg-rose-500/10 p-3 text-xs text-rose-300">
               <AlertTriangle className="h-4 w-4 shrink-0 text-rose-400" />
-              <span>{error}</span>
+              <span>{errors.title.message}</span>
             </div>
           )}
 
@@ -93,10 +95,11 @@ export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
             </label>
             <input
               type="text"
-              required
               placeholder="e.g. Database connection timeout error"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
+              {...register('title', {
+                required: 'Please provide a ticket title',
+                validate: (value) => Boolean(value.trim()) || 'Please provide a ticket title',
+              })}
               className="w-full rounded-xl border border-slate-800 bg-slate-950/70 px-4 py-2.5 text-sm text-white placeholder-slate-600 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-colors"
             />
           </div>
@@ -108,8 +111,7 @@ export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
             <textarea
               rows={3}
               placeholder="Detailed description of the issue or requirement..."
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
+              {...register('description')}
               className="w-full rounded-xl border border-slate-800 bg-slate-950/70 px-4 py-2.5 text-sm text-white placeholder-slate-600 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-colors"
             />
           </div>
@@ -121,8 +123,7 @@ export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
                 Priority
               </label>
               <select
-                value={priority}
-                onChange={(e) => setPriority(e.target.value as TicketPriority)}
+                {...register('priority')}
                 className="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-sm text-white focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
               >
                 <option value="LOW">🟢 Low</option>
@@ -138,8 +139,7 @@ export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
                 Assignee {currentUser.role !== 'ADMIN' && '(Optional)'}
               </label>
               <select
-                value={assignedToId}
-                onChange={(e) => setAssignedToId(e.target.value)}
+                {...register('assignedToId')}
                 className="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2.5 text-sm text-white focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
               >
                 <option value="">Unassigned</option>
@@ -162,7 +162,7 @@ export const CreateTicketModal: React.FC<CreateTicketModalProps> = ({
             </button>
             <button
               type="submit"
-              disabled={loading}
+              disabled={isSubmitting}
               className="flex items-center gap-2 rounded-xl bg-linear-to-r from-indigo-600 to-indigo-500 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-indigo-500/25 hover:from-indigo-500 hover:to-indigo-400 transition-all disabled:opacity-50"
             >
               <Sparkles className="h-4 w-4" />

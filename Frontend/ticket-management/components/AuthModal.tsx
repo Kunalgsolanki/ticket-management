@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
+import { useForm } from 'react-hook-form';
 import { loginUser, signupUser, verifyOtp, resendOtp } from '../lib/api';
 import { User, UserRole } from '../lib/types';
 import {
@@ -21,12 +22,22 @@ interface AuthModalProps {
   onSuccess: (user: User, token: string) => void;
 }
 
+interface AuthFormValues {
+  name: string;
+  email: string;
+  password: string;
+  role: UserRole;
+}
+
 export const AuthModal: React.FC<AuthModalProps> = ({ onSuccess }) => {
   const [isLogin, setIsLogin] = useState(true);
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [role, setRole] = useState<UserRole>('USER');
+  const {
+    register,
+    handleSubmit,
+    formState: { errors: formErrors },
+  } = useForm<AuthFormValues>({
+    defaultValues: { name: '', email: '', password: '', role: 'USER' },
+  });
 
   // OTP overlay state
   const [showOtpModal, setShowOtpModal] = useState(false);
@@ -101,13 +112,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({ onSuccess }) => {
     }
   };
 
-  const handleAuthSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleAuthSubmit = async (formValues: AuthFormValues) => {
     setError(null);
     setLoading(true);
     try {
       if (isLogin) {
-        const data = await loginUser(email, password);
+        const data = await loginUser(formValues.email, formValues.password);
         if ('requireOtp' in data && data.requireOtp) {
           setOtpEmail(data.email);
           setDigits(['', '', '', '', '', '']);
@@ -119,12 +129,16 @@ export const AuthModal: React.FC<AuthModalProps> = ({ onSuccess }) => {
           onSuccess(data.user, data.token);
         }
       } else {
-        if (!name.trim()) throw new Error('Please enter your full name');
-        const data = await signupUser(name, email, password, role);
+        const data = await signupUser(
+          formValues.name.trim(),
+          formValues.email,
+          formValues.password,
+          formValues.role
+        );
         onSuccess(data.user, data.token);
       }
-    } catch (err: any) {
-      setError(err.message || 'Authentication failed. Please check your credentials.');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Authentication failed. Please check your credentials.');
     } finally {
       setLoading(false);
     }
@@ -142,8 +156,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({ onSuccess }) => {
       const data = await verifyOtp(otpEmail, otpValue);
       setShowOtpModal(false);
       onSuccess(data.user, data.token);
-    } catch (err: any) {
-      setOtpError(err.message || 'Invalid or expired code. Try again.');
+    } catch (err: unknown) {
+      setOtpError(err instanceof Error ? err.message : 'Invalid or expired code. Try again.');
       setDigits(['', '', '', '', '', '']);
       setTimeout(() => digitRefs.current[0]?.focus(), 50);
     } finally {
@@ -161,8 +175,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({ onSuccess }) => {
       setResendCountdown(60);
       setDigits(['', '', '', '', '', '']);
       digitRefs.current[0]?.focus();
-    } catch (err: any) {
-      setOtpError(err.message || 'Failed to resend code');
+    } catch (err: unknown) {
+      setOtpError(err instanceof Error ? err.message : 'Failed to resend code');
     } finally {
       setIsResending(false);
     }
@@ -208,32 +222,41 @@ export const AuthModal: React.FC<AuthModalProps> = ({ onSuccess }) => {
             </div>
           )}
 
-          <form onSubmit={handleAuthSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit(handleAuthSubmit)} className="space-y-4">
             {!isLogin && (
               <div>
                 <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">Full Name</label>
                 <div className="relative">
                   <UserIcon className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
-                  <input type="text" required placeholder="Your Name" value={name} onChange={(e) => setName(e.target.value)}
+                  <input type="text" placeholder="Your Name" {...register('name', {
+                    required: isLogin ? false : 'Please enter your full name',
+                  })}
                     className="w-full rounded-xl border border-slate-800 bg-slate-950/70 pl-10 pr-4 py-2.5 text-sm text-white placeholder-slate-600 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-colors" />
                 </div>
+                {formErrors.name && <p className="mt-1 text-xs text-rose-300">{formErrors.name.message}</p>}
               </div>
             )}
             <div>
               <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">Email Address</label>
               <div className="relative">
                 <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
-                <input type="email" required placeholder="you@company.com" value={email} onChange={(e) => setEmail(e.target.value)}
+                <input type="email" placeholder="you@company.com" {...register('email', {
+                  required: 'Email is required',
+                })}
                   className="w-full rounded-xl border border-slate-800 bg-slate-950/70 pl-10 pr-4 py-2.5 text-sm text-white placeholder-slate-600 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-colors" />
               </div>
+              {formErrors.email && <p className="mt-1 text-xs text-rose-300">{formErrors.email.message}</p>}
             </div>
             <div>
               <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">Password</label>
               <div className="relative">
                 <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
-                <input type="password" required placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)}
+                <input type="password" placeholder="Password" {...register('password', {
+                  required: 'Password is required',
+                })}
                   className="w-full rounded-xl border border-slate-800 bg-slate-950/70 pl-10 pr-4 py-2.5 text-sm text-white placeholder-slate-600 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-colors" />
               </div>
+              {formErrors.password && <p className="mt-1 text-xs text-rose-300">{formErrors.password.message}</p>}
             </div>
             <button type="submit" disabled={loading}
               className="w-full mt-2 flex items-center justify-center gap-2 rounded-xl bg-linear-to-r from-indigo-600 to-indigo-500 py-3 px-4 text-sm font-semibold text-white shadow-lg shadow-indigo-500/25 hover:from-indigo-500 hover:to-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all disabled:opacity-50 cursor-pointer">

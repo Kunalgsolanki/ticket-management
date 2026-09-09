@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { startTransition, useState, useEffect } from 'react';
 import { User, RoleDefinition, Permission } from '../lib/types';
 import { SYSTEM_PERMISSIONS } from '../lib/permissions';
 import {
@@ -23,10 +23,9 @@ import {
   CheckCircle2,
   AlertCircle,
   Sparkles,
-  Lock,
-  Layers,
   ChevronRight,
 } from 'lucide-react';
+import { MobileRolePermissionView } from './MobileRolePermissionView';
 
 interface RolePermissionModalProps {
   isOpen: boolean;
@@ -100,18 +99,22 @@ export const RolePermissionModal: React.FC<RolePermissionModalProps> = ({
           return data[0];
         });
       }
-    } catch (err: any) {
-      setError(err.message || 'Failed to load roles');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to load roles');
     } finally {
       setIsLoadingRoles(false);
     }
   };
 
+  // Role data is loaded when the modal opens; the deferred task avoids a synchronous effect update.
   useEffect(() => {
     if (isOpen) {
-      clearFeedback();
-      loadRoles();
+      startTransition(() => clearFeedback());
+      const loadTask = window.setTimeout(() => void loadRoles(), 0);
+      return () => window.clearTimeout(loadTask);
     }
+    // The loader intentionally uses the current selection while refreshing the modal.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
 
   if (!isOpen) return null;
@@ -145,8 +148,8 @@ export const RolePermissionModal: React.FC<RolePermissionModalProps> = ({
       setSuccess(`Permissions updated for role ${updated.name}`);
       await loadRoles();
       onUsersUpdated();
-    } catch (err: any) {
-      setError(err.message || 'Failed to update role permissions');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to update role permissions');
     } finally {
       setIsSavingRole(false);
     }
@@ -171,8 +174,8 @@ export const RolePermissionModal: React.FC<RolePermissionModalProps> = ({
       setShowCreateRoleForm(false);
       await loadRoles();
       handleSelectRole(created);
-    } catch (err: any) {
-      setError(err.message || 'Failed to create role');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to create role');
     } finally {
       setIsCreatingRole(false);
     }
@@ -189,8 +192,8 @@ export const RolePermissionModal: React.FC<RolePermissionModalProps> = ({
       setSuccess(`Role "${roleName}" deleted`);
       await loadRoles();
       onUsersUpdated();
-    } catch (err: any) {
-      setError(err.message || 'Failed to delete role');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to delete role');
     }
   };
 
@@ -201,8 +204,8 @@ export const RolePermissionModal: React.FC<RolePermissionModalProps> = ({
       await updateUserRole(token, userId, roleName);
       setSuccess(`User role updated to ${roleName}`);
       onUsersUpdated();
-    } catch (err: any) {
-      setError(err.message || 'Failed to update user role');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to update user role');
     }
   };
 
@@ -230,8 +233,8 @@ export const RolePermissionModal: React.FC<RolePermissionModalProps> = ({
       setSuccess(`Permissions updated for ${selectedUserForPerms.name}`);
       setSelectedUserForPerms(null);
       onUsersUpdated();
-    } catch (err: any) {
-      setError(err.message || 'Failed to update user permissions');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to update user permissions');
     } finally {
       setIsSavingUserPerms(false);
     }
@@ -248,7 +251,7 @@ export const RolePermissionModal: React.FC<RolePermissionModalProps> = ({
     <div className={embedded ? 'animate-fadeIn' : 'fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-slate-950/70 p-4 backdrop-blur-md sm:p-6'}>
       <div className={`role-permission-shell relative w-full ${embedded ? 'max-w-6xl' : 'max-w-5xl'} rounded-xl bg-slate-900 border border-slate-800 shadow-2xl overflow-hidden flex flex-col max-h-[90vh]`}>
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800 bg-slate-900/90 sticky top-0 z-10">
+        <div className="hidden md:flex items-center justify-between px-6 py-4 border-b border-slate-800 bg-slate-900/90 sticky top-0 z-10">
           <div className="flex items-center space-x-3">
             <div className="p-2.5 rounded-xl bg-gradient-to-tr from-violet-600 to-indigo-500 text-white shadow-lg shadow-indigo-500/25">
               <KeyRound className="w-5 h-5" />
@@ -272,6 +275,36 @@ export const RolePermissionModal: React.FC<RolePermissionModalProps> = ({
             <X className="w-5 h-5" />
           </button>
         </div>
+
+        <MobileRolePermissionView
+          activeTab={activeTab}
+          onTabChange={setActiveTab}
+          roles={roles}
+          users={users}
+          selectedRole={selectedRole}
+          editedPermissions={editedPermissions}
+          onSelectRole={handleSelectRole}
+          onTogglePermission={handleTogglePermission}
+          onSaveRolePermissions={handleSaveRolePermissions}
+          isSavingRole={isSavingRole}
+          userSearch={userSearch}
+          onUserSearchChange={setUserSearch}
+          filteredUsers={filteredUsers}
+          currentUser={currentUser}
+          onUserRoleChange={handleUserRoleChange}
+          onOpenUserPerms={handleOpenUserPerms}
+          selectedUserForPerms={selectedUserForPerms}
+          userCustomPerms={userCustomPerms}
+          onToggleUserPerm={handleToggleUserPerm}
+          onSaveUserPerms={handleSaveUserPerms}
+          isSavingUserPerms={isSavingUserPerms}
+          onCloseUserPerms={() => setSelectedUserForPerms(null)}
+          onClose={onClose}
+          error={error}
+          success={success}
+        />
+
+        <div className="hidden md:block">
 
         {/* Tab Navigation */}
         <div className="flex border-b border-slate-800 bg-slate-950/40 px-6">
@@ -821,6 +854,7 @@ export const RolePermissionModal: React.FC<RolePermissionModalProps> = ({
           >
             Close
           </button>
+        </div>
         </div>
       </div>
     </div>

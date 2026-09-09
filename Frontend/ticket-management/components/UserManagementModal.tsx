@@ -89,8 +89,8 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
       setSuccess(`User "${createName}" created as ${createRole}`);
       resetCreateForm();
       onUsersUpdated();
-    } catch (err: any) {
-      setError(err.message || 'Failed to create user');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to create user');
     } finally {
       setIsCreating(false);
     }
@@ -103,8 +103,8 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
       await updateUserRole(token, userId, newRole);
       setSuccess(`Role updated to ${newRole}`);
       onUsersUpdated();
-    } catch (err: any) {
-      setError(err.message || 'Failed to update role');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to update role');
     }
   };
 
@@ -117,8 +117,8 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
       setSuccess('User deleted successfully');
       setDeletingUserId(null);
       onUsersUpdated();
-    } catch (err: any) {
-      setError(err.message || 'Failed to delete user');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to delete user');
     } finally {
       setIsDeleting(false);
     }
@@ -131,17 +131,17 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
 
   return (
     <div className={embedded ? 'animate-fadeIn' : 'fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm'}>
-      <div className={`w-full ${embedded ? 'max-w-5xl' : 'max-w-3xl'} max-h-[85vh] flex flex-col rounded-xl border border-slate-800 bg-slate-900 shadow-2xl overflow-hidden`}>
+      <div className={`user-management-panel w-full ${embedded ? 'max-w-5xl' : 'max-w-3xl'} max-h-[85vh] flex flex-col rounded-xl border border-slate-800 bg-slate-900 shadow-2xl overflow-hidden`}>
 
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-slate-800 px-6 py-4">
-          <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 px-6 py-4">
+          <div className="flex min-w-0 items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-500/10 border border-amber-500/20">
               <Crown className="h-5 w-5 text-amber-400" />
             </div>
-            <div>
-              <h2 className="text-lg font-bold text-white">User Management</h2>
-              <p className="text-xs text-slate-400">{users.length} team members • Permission-based access</p>
+            <div className="min-w-0">
+              <h2 className="truncate text-lg font-bold text-white">User Management</h2>
+              <p className="truncate text-xs text-slate-400">{users.length} team members • Permission-based access</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -260,7 +260,7 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
         {/* Users Table */}
         <div className="flex-1 overflow-auto px-6 py-4">
           <div className="overflow-hidden rounded-xl border border-slate-800 bg-slate-950/50">
-            <table className="w-full text-left text-xs text-slate-300">
+            <table className="user-management-table w-full text-left text-xs text-slate-300">
               <thead className="border-b border-slate-800 bg-slate-950/80 text-[10px] uppercase tracking-wider text-slate-500 font-semibold">
                 <tr>
                   <th className="px-4 py-3">User</th>

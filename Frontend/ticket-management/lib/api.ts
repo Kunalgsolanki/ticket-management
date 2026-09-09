@@ -1,6 +1,6 @@
 import { AuthResponse, User, UserRole, LoginResult } from './types';
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
 export async function loginUser(email: string, password: string): Promise<LoginResult> {
   const res = await fetch(`${API_BASE}/user/login`, {

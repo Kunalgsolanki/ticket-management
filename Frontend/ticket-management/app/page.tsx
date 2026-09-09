@@ -16,19 +16,26 @@ import { hasPermission } from '../lib/permissions';
 import { WorkspaceSidebar } from '../components/WorkspaceSidebar';
 import { useAppContext } from '../lib/app-context';
 import { initBrowserNotifications, showBrowserNotification } from '../lib/firebase';
-import { Bell, Sparkles, X, CheckCircle2, AlertTriangle, Trash2, Info } from 'lucide-react';
+import { Bell, X, CheckCircle2, Trash2, Info } from 'lucide-react';
 
 export default function Home() {
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const [token, setToken] = useState<string | null>(null);
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [users, setUsers] = useState<User[]>([]);
-  const [isConnected, setIsConnected] = useState(false);
+  const [isConnected, setIsConnected] = useState(socket.connected);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [editingTicket, setEditingTicket] = useState<Ticket | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState<{ title: string; body?: string; type?: 'created' | 'updated' | 'deleted' | 'info' } | null>(null);
-  const { workspaceView, setWorkspaceView } = useAppContext();
+  const {
+    workspaceView,
+    setWorkspaceView,
+    currentUser,
+    token,
+    isHydrated,
+    setSession,
+    updateCurrentUser,
+    clearSession,
+  } = useAppContext();
 
   // Show rich popup notification
   const showToast = useCallback((title: string, body?: string, type: 'created' | 'updated' | 'deleted' | 'info' = 'info') => {
@@ -36,21 +43,7 @@ export default function Home() {
     setTimeout(() => setToastMessage(null), 5000);
   }, []);
 
-  // 1. Initialize Auth from localStorage
-  useEffect(() => {
-    try {
-      const savedUser = localStorage.getItem('ticket_user');
-      const savedToken = localStorage.getItem('ticket_token');
-      if (savedUser && savedToken) {
-        setCurrentUser(JSON.parse(savedUser));
-        setToken(savedToken);
-      }
-    } catch (e) {
-      console.error('Failed to load user session', e);
-    }
-  }, []);
-
-  // 2. Fetch Users & Sync current user role/permissions
+  // Fetch Users & Sync current user role/permissions
   const refreshUsersAndSyncCurrentUser = useCallback(() => {
     fetchAllUsers()
       .then((data) => {
@@ -58,13 +51,12 @@ export default function Home() {
         if (currentUser) {
           const me = data.find((u) => u.id === currentUser.id);
           if (me) {
-            setCurrentUser(me);
-            localStorage.setItem('ticket_user', JSON.stringify(me));
+            updateCurrentUser(me);
           }
         }
       })
       .catch((err) => console.error('Failed to fetch team users:', err));
-  }, [currentUser]);
+  }, [currentUser, updateCurrentUser]);
 
   useEffect(() => {
     if (currentUser) {
@@ -72,7 +64,7 @@ export default function Home() {
       // Initialize browser push notifications (asks permission + shows welcome OS notification)
       initBrowserNotifications();
     }
-  }, [token]);
+  }, [currentUser, refreshUsersAndSyncCurrentUser]);
 
   // 3. Setup Socket.IO Event Handlers
   useEffect(() => {
@@ -135,7 +127,6 @@ export default function Home() {
     socket.on('ticket:deleted', onTicketDeleted);
 
     if (socket.connected) {
-      setIsConnected(true);
       ticketSocket.fetchAll();
     }
 
@@ -151,10 +142,7 @@ export default function Home() {
 
   // Handle Auth Login/Signup Success
   const handleAuthSuccess = (user: User, userToken: string) => {
-    setCurrentUser(user);
-    setToken(userToken);
-    localStorage.setItem('ticket_user', JSON.stringify(user));
-    localStorage.setItem('ticket_token', userToken);
+    setSession(user, userToken);
     ticketSocket.fetchAll();
     // Set up notifications on fresh login
     initBrowserNotifications();
@@ -162,12 +150,9 @@ export default function Home() {
 
   // Handle Logout
   const handleLogout = () => {
-    setCurrentUser(null);
-    setToken(null);
+    clearSession();
     setEditingTicket(null);
     setIsEditModalOpen(false);
-    localStorage.removeItem('ticket_user');
-    localStorage.removeItem('ticket_token');
   };
 
   // Handle Open Edit Modal
@@ -178,6 +163,10 @@ export default function Home() {
 
   const canManageUsers = hasPermission(currentUser, 'user:manage');
   const canManagePermissions = hasPermission(currentUser, 'role:manage');
+
+  if (!isHydrated) {
+    return <div className="min-h-screen bg-(--background)" />;
+  }
 
   return (
     <div className="app-shell min-h-screen bg-[var(--background)] text-[var(--foreground)] selection:bg-zinc-400 selection:text-black md:flex">
